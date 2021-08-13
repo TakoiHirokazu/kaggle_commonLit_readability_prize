@@ -1,0 +1,16 @@
+*.DS_Store
+input/
+ex/
+*.csv
+*.xlsx
+*.gz
+*.pkl
+*~
+*.swp
+*.feather
+*.pyc
+*.pth
+
+
+#jupyter notebook
+.ipynb_checkpoints

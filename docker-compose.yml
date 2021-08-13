@@ -1,0 +1,17 @@
+version: "2.3"
+services:
+  kaggle:
+    build:
+     context: .
+     shm_size: '32gb'
+    shm_size: '32gb'
+    container_name: commonlit
+    volumes:
+     - ./:/tmp/working
+    working_dir: /tmp/working
+    runtime: nvidia
+    environment:
+     - LD_LIBRARY_PATH=/usr/local/cuda/lib64
+    ports:
+     - 8888:8888
+    command: jupyter lab --ip=0.0.0.0 --port 8888 --allow-root --NotebookApp.notebook_dir='/tmp/working' --no-browser --LabApp.token=''
