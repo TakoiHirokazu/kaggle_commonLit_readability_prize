@@ -23,7 +23,7 @@ I used three different machines.
 # Environment(except for kaggle notebook)
 ```
 $ docker-compose up --build
-$ docker exec -it commonlit bach
+$ docker exec -it commonlit bash
 ```
 
 # Data download
@@ -43,8 +43,8 @@ I used several pretrained models that are publicly available in the kaggle datas
  # Train
  `$ sh bin/train.sh` 
 
- Since the training results vary depending on the hardware, please use the following hardware to reproduce the results.
- However, please note that the results for ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) could not be reproduced even if the hardware is the same and the seed is fixed. Also, I hadn't fixed the seed in the pretrain of roberta-base, so if you want to reproduce ex237.py, please use  [here](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm). Hardware is the number of the Hardware listed above.
+ Training results vary depending on the hardware, so if you want to reproduce the results, you need to change the hardware according to the model.
+ However, please note that the results for ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) could not be reproduced even if the hardware is the same and the seed is fixed. Also, I hadn't fixed the seed in the pretrain of roberta-base, so if you want to reproduce ex237.py, please use  [here](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm). 
  
 | exp | Hardware|
 | ---- | ---- | 
