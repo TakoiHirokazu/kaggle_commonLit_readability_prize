@@ -44,14 +44,18 @@ I used several pretrained models that are publicly available in the kaggle datas
  ここにコマンド
 
  Since the training results vary depending on the hardware, please use the following hardware to reproduce the results.
- However, please note that the results for ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) could not be reproduced even if the hardware is the same and the seed is fixed.Also, I hadn't fixed the seed in the pretrain of roberta-base, so if you want to reproduce ex237.py, please use  [here](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm).
+ However, please note that the results for ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) could not be reproduced even if the hardware is the same and the seed is fixed. Also, I hadn't fixed the seed in the pretrain of roberta-base, so if you want to reproduce ex237.py, please use  [here](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm). Hardware is the number of the Hardware listed above.
  
 | exp | Hardware|
 | ---- | ---- | 
 | ex014.py | 3 | 
 | ex015.py | 3 | 
+| ex064.py | 1 |
 | ex072.py | 1 |
+| ex084.py | 1 |
+| ex094.py | 1 |
 | ex107.py | 1 |
+| ex131.py | 2 |
 | ex182.py | 2 |
 | ex190.py | 2 |
 | ex194.py | 2 |
@@ -70,5 +74,10 @@ I used several pretrained models that are publicly available in the kaggle datas
 | ex497.py | 2 |
 | ex507.py | 2 |
 
+# Ensemble & Postprocess
+ここにコマンド
+
+The ensemble weights were adjusted based on the output of the optimization and by looking at the Public Score.
+The PostProcess coefficients were also adjusted based on the optimization output and by looking at the Public Score.
  # Predict
 
