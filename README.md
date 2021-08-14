@@ -22,7 +22,7 @@ I used three different machines.
 
 # Environment(except for kaggle notebook)
 ```
-$ docker-compose up --build
+$ docker-compose up --build -d
 $ docker exec -it commonlit bash
 ```
 
