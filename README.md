@@ -84,7 +84,7 @@ The final weights, coefficientsare and thresholds as follows. The public and pri
 | exp | model| Public| Private| weight |
 | ---- | ---- | ---- | ---- |---- |
 | ex015 | roberta base -> svr |0.476 |0.478 | 0.020 |
-| ex015 | roberta base -> ridge |0.476 |0.478 | 0.020 |
+| ex015 | roberta base -> ridge |0.475 |0.476 | 0.020 |
 | ex072 | roberta large| 0.463| 0.466| 0.088|
 | ex107 | bart large | 0.469| 0.471| 0.090|
 | ex182 | deberta large | 0.460| 0.463| 0.230|
