@@ -45,7 +45,7 @@ Plese download data to `./data` from https://www.kaggle.com/takoihiraokazu/commo
  `$ sh bin/train.sh` 
  
  The results for ex064.py, ex084.py, ex094.py, and ex131.py were used only to optimize the post process coefficients. </br>
- Please note that the results of ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) will change with each train. Also, I did not fix the seed in mlm_roberta_base.py, so if you want to reproduce ex237.py, please use  [this pretrained model](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm) instead of output of mlm_roberta_base.py. I have also listed below the hardware numbers where I performed each training during the competition.
+ Please note that the results of ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) will change with each train. Also, I did not fix the seed in mlm_roberta_base.py during the competition period, so if you want to reproduce ex237.py, please use  [this pretrained model](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm) instead of output of mlm_roberta_base.py. I have also listed below the hardware numbers where I performed each training during the competition.
 | exp | Hardware|
 | ---- | ---- | 
 | ex014.py | 3 | 
