@@ -45,7 +45,7 @@ Plese download data to `./data` from https://www.kaggle.com/takoihiraokazu/commo
  `$ sh bin/train.sh` 
  
  The results for ex064.py, ex084.py, ex094.py, and ex131.py were used only to optimize the post process coefficients. </br>
- Please note that the results of ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) will change with each train. Also, I hadn't fixed the seed in the pretrain of roberta-base(mlm_roberta_base.py), so if you want to reproduce ex237.py, please use  [this pretrained model](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm). I have also listed below the hardware numbers where I performed each training during the competition.
+ Please note that the results of ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) will change with each train. Also, I did not fix the seed in mlm_roberta_base.py, so if you want to reproduce ex237.py, please use  [this pretrained model](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm) instead of output of mlm_roberta_base.py. I have also listed below the hardware numbers where I performed each training during the competition.
 | exp | Hardware|
 | ---- | ---- | 
 | ex014.py | 3 | 
@@ -110,5 +110,5 @@ The final weights, coefficientsare and thresholds as follows. The public and pri
 -	-0.9 > Predictions >= -2.0 -> Predictions * 1.02150304
 -	-2.0 > Predictions -> Predictions * 1.02764047
 
- # Predict
-
+# Predict
+`$ sh bin/predict.sh`
