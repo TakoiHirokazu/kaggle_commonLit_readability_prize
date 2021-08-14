@@ -253,7 +253,7 @@ with timer("svr + ridge"):
         oof_svr[fold_array == fold] = pred
         score = calc_loss(y_val, pred)
         LOGGER.info(f"fold_svr:{fold}:{score}")
-        save_path = MODEL_PATH_BASE + "_svr_roberta_emb_{fold}.pkl"
+        save_path = MODEL_PATH_BASE + f"_svr_roberta_emb_{fold}.pkl"
         pickle.dump(model_svr, open(save_path, 'wb'))
 
         # ridge
@@ -263,7 +263,7 @@ with timer("svr + ridge"):
         oof_ridge[fold_array == fold] = pred
         score = calc_loss(y_val, pred)
         LOGGER.info(f"fold_ridge:{fold}:{score}")
-        save_path = MODEL_PATH_BASE + "_ridge_roberta_emb_{fold}.pkl"
+        save_path = MODEL_PATH_BASE + f"_ridge_roberta_emb_{fold}.pkl"
         pickle.dump(ridge, open(save_path, 'wb'))
 
 
