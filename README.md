@@ -43,11 +43,9 @@ Plese download data to `./data` from https://www.kaggle.com/takoihiraokazu/commo
 
  # Train
  `$ sh bin/train.sh` 
-
- Training results vary depending on the hardware, so if you want to reproduce the results, you need to change the hardware according to the exp.
- However, please note that the results for ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) could not be reproduced even if the hardware is the same. Also, I hadn't fixed the seed in the pretrain of roberta-base(mlm_roberta_base.py), so if you want to reproduce ex237.py, please use  [this pretrained model](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm). 
- The Hardware column in the table below lists the above Hardware numbers.
  
+ The results for ex064.py, ex084.py, ex094.py, and ex131.py were used only to optimize the post process coefficients. </br>
+ Please note that the results of ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) will change with each train. Also, I hadn't fixed the seed in the pretrain of roberta-base(mlm_roberta_base.py), so if you want to reproduce ex237.py, please use  [this pretrained model](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm). I have also listed below the hardware numbers where I performed each training during the competition.
 | exp | Hardware|
 | ---- | ---- | 
 | ex014.py | 3 | 
@@ -79,16 +77,16 @@ Plese download data to `./data` from https://www.kaggle.com/takoihiraokazu/commo
 # Ensemble & Post process
 `$ sh bin/ensemble_postprocess.sh` 
 
-The ensemble weights were adjusted based on the output of the optimization and by looking at the Public Score.
-The PostProcess coefficients were also adjusted based on the optimization output and by looking at the Public Score.
-The final weights and coefficients are as follows. The public and private scores for each model are also listed.
-
+The ensemble weights were adjusted based on the output of ensemble.py and by looking at the Public Score.
+The PostProcess coefficients and thresholds were also adjusted based on the output of postprocess.py and by looking at the Public Score.
+The final weights, coefficientsare and thresholds as follows. The public and private scores for each model are also listed.
+### ensebmle
 | exp | model| Public| Private| weight |
 | ---- | ---- | ---- | ---- |---- |
 | ex015 | roberta base -> svr |0.476 |0.478 | 0.020 |
 | ex015 | roberta base -> ridge |0.476 |0.478 | 0.020 |
 | ex072 | roberta large| 0.463| 0.466| 0.088|
-| ex107 | bart large | 0.463| 0.466| 0.088|
+| ex107 | bart large | 0.463| 0.466| 0.090|
 | ex182 | deberta large | 0.460| 0.463| 0.230|
 | ex190 | electra large | 0.470| 0.471| 0.050|
 | ex194 | deberta v2 xlarge | 0.466 | 0.467| 0.050|
@@ -104,5 +102,13 @@ The final weights and coefficients are as follows. The public and private scores
 | ex465 | electra base | 0.482| 0.483| -0.170|
 | ex497 | bert base uncased | 0.506| 0.497| -0.140|
 | ex507 | distilbart cnn 12 6 | 0.479| 0.477| 0.090|
+### post process
+-	Predictions >= 0.3 -> Predictions * 1.07
+-	0.3 > Predictions >= 0 -> Predictions * 1.2
+-	0 > Predictions >= -0.7 -> Predictions * 0.97485814
+-	-0.7 > Predictions >= -0.9 -> Predictions * 1.01
+-	-0.9 > Predictions >= -2.0 -> Predictions * 1.02150304
+-	-2.0 > Predictions -> Predictions * 1.02764047
+
  # Predict
 
