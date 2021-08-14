@@ -45,7 +45,7 @@ Plese download data to `./data` from https://www.kaggle.com/takoihiraokazu/commo
  `$ sh bin/train.sh` 
 
  Training results vary depending on the hardware, so if you want to reproduce the results, you need to change the hardware according to the exp.
- However, please note that the results for ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) could not be reproduced even if the hardware is the same. Also, I hadn't fixed the seed in the pretrain of roberta-base(roberta_base_mlm.py), so if you want to reproduce ex237.py, please use  [here](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm). 
+ However, please note that the results for ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) could not be reproduced even if the hardware is the same. Also, I hadn't fixed the seed in the pretrain of roberta-base(mlm_roberta_base.py), so if you want to reproduce ex237.py, please use  [this pretrained model](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm). 
  The Hardware column in the table below lists the above Hardware numbers.
  
 | exp | Hardware|
@@ -77,9 +77,32 @@ Plese download data to `./data` from https://www.kaggle.com/takoihiraokazu/commo
 | ex507.py | 2 |
 
 # Ensemble & Post process
-ここにコマンド
+`$ sh bin/ensemble_postprocess.sh` 
 
 The ensemble weights were adjusted based on the output of the optimization and by looking at the Public Score.
 The PostProcess coefficients were also adjusted based on the optimization output and by looking at the Public Score.
+The final weights and coefficients are as follows. The public and private scores for each model are also listed.
+
+| exp | model| Public| Private| weight |
+| ---- | ---- | ---- | ---- |---- |
+| ex015 | roberta base -> svr |0.476 |0.478 | 0.020 |
+| ex015 | roberta base -> ridge |0.476 |0.478 | 0.020 |
+| ex072 | roberta large| 0.463| 0.466| 0.088|
+| ex107 | bart large | 0.463| 0.466| 0.088|
+| ex182 | deberta large | 0.460| 0.463| 0.230|
+| ex190 | electra large | 0.470| 0.471| 0.050|
+| ex194 | deberta v2 xlarge | 0.466 | 0.467| 0.050|
+| ex216 | deberta v2 xxlarge | 0.465| 0.466| 0.140|
+| ex237 | roberta base(with mlm) | 0.476| 0.473| 0.040|
+| ex272 | funnel large base | 0.471| 0.473| 0.050|
+| ex292 | mpnet base | 0.470| 0.473| 0.130|
+| ex384 | muppet roberta large | 0.466| 0.468| 0.022|
+| ex407 | funnel large | 0.464| 0.471| 0.110|
+| ex429 | gpt2 medium | 0.478| 0.482| 0.170|
+| ex434 | t5 large | 0.498| 0.494| -0.110|
+| ex448 + ex450 | ablert xxlarge v2 | 0.467| 0.471| 0.120|
+| ex465 | electra base | 0.482| 0.483| -0.170|
+| ex497 | bert base uncased | 0.506| 0.497| -0.140|
+| ex507 | distilbart cnn 12 6 | 0.479| 0.477| 0.090|
  # Predict
 
