@@ -98,7 +98,7 @@ The final weights, coefficientsare and thresholds as follows. The public and pri
 | ex407 | funnel large | 0.464| 0.471| 0.110|
 | ex429 | gpt2 medium | 0.478| 0.482| 0.170|
 | ex434 | t5 large | 0.498| 0.494| -0.110|
-| ex448 + ex450 | ablert xxlarge v2 | 0.467| 0.471| 0.120|
+| ex448 + ex450 | albert xxlarge v2 | 0.467| 0.471| 0.120|
 | ex465 | electra base | 0.482| 0.483| -0.170|
 | ex497 | bert base uncased | 0.506| 0.497| -0.140|
 | ex507 | distilbart cnn 12 6 | 0.479| 0.477| 0.090|
