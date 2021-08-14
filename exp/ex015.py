@@ -8,21 +8,22 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
 from transformers import RobertaModel
-from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers import RobertaTokenizer
 import logging
 import sys
 from contextlib import contextmanager
 import time
 import random
-from tqdm import tqdm
 import os
+import pickle
+from sklearn.svm import SVR
+from sklearn.linear_model import Ridge
 
 
 # ==================
 # Constant
 # ==================
-ex = "014"
+ex = "015"
 TRAIN_PATH = "../data/train.csv"
 FOLD_PATH = "../data/fe001_train_folds.csv"
 if not os.path.exists(f"../output/ex/ex{ex}"):
@@ -30,9 +31,11 @@ if not os.path.exists(f"../output/ex/ex{ex}"):
     os.makedirs(f"../output/ex/ex{ex}/ex{ex}_model")
 
 MODEL_PATH_BASE = f"../output/ex/ex{ex}/ex{ex}_model/ex{ex}"
-OOF_SAVE_PATH = f"../output/ex/ex{ex}/ex{ex}_oof.npy"
 LOGGER_PATH = f"../output/ex/ex{ex}/ex{ex}.txt"
+OOF_RIDGE_SAVE_PATH = f"../output/ex/ex{ex}/ex{ex}_ridge.npy"
+OOF_SVR_SAVE_PATH = f"../output/ex/ex{ex}/ex{ex}_svr.npy"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 
 # ===============
 # Settings
@@ -40,13 +43,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SEED = 0
 num_workers = 4
 BATCH_SIZE = 24
-n_epochs = 5
-es_patience = 3
 max_len = 256
-weight_decay = 0.1
-lr = 5e-5
-num_warmup_steps = 10
-
 MODEL_PATH = '../models/roberta/roberta-base'
 tokenizer = RobertaTokenizer.from_pretrained(MODEL_PATH)
 
@@ -172,13 +169,13 @@ y = train["target"]
 fold_df = pd.read_csv(FOLD_PATH)
 fold_array = fold_df["kfold"].values
 
-
 # ================================
 # train
 # ================================
-with timer("roberta"):
+with timer("svr + ridge"):
     set_seed(SEED)
-    oof = np.zeros([len(train)])
+    oof_svr = np.zeros([len(train)])
+    oof_ridge = np.zeros([len(train)])
     for fold in range(5):
         x_train, y_train = train.iloc[fold_array !=
                                       fold], y.iloc[fold_array != fold]
@@ -193,120 +190,86 @@ with timer("roberta"):
 
         # loader
         train_loader = DataLoader(
-            dataset=train_, batch_size=BATCH_SIZE, shuffle=True, num_workers=num_workers)
+            dataset=train_, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
         val_loader = DataLoader(
-            dataset=val_, batch_size=BATCH_SIZE, shuffle=False, num_workers=num_workers)
+            dataset=val_, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
         # model
         model = roberta_model()
-        model = model.to(device)
+        model.load_state_dict(torch.load(
+            f"../output/ex/ex014/ex014_model/ex014_{fold}.pth"))
+        model.to(device)
+        model.eval()
 
-        # optimizer, scheduler
-        param_optimizer = list(model.named_parameters())
-        no_decay = ['bias', 'LayerNorm.bias', 'LayerNorm.weight']
-        optimizer_grouped_parameters = [
-            {'params': [p for n, p in param_optimizer if not any(
-                nd in n for nd in no_decay)], 'weight_decay': weight_decay},
-            {'params': [p for n, p in param_optimizer if any(
-                nd in n for nd in no_decay)], 'weight_decay': 0.0}
-        ]
-        optimizer = AdamW(optimizer_grouped_parameters,
-                          lr=lr,
-                          betas=(0.9, 0.999),
-                          weight_decay=weight_decay,
-                          )
-        num_train_optimization_steps = int(len(train_loader) * n_epochs)
-        scheduler = get_linear_schedule_with_warmup(optimizer,
-                                                    num_warmup_steps=num_warmup_steps,
-                                                    num_training_steps=num_train_optimization_steps)
+        # make embedding
+        train_emb = np.ndarray((0, 768))
+        val_emb = np.ndarray((0, 768))
 
-        criterion = nn.MSELoss()
-        best_val = None
-        patience = es_patience
-        for epoch in tqdm(range(n_epochs)):
-            with timer(f"model_fold:{epoch}"):
+        # train
+        with torch.no_grad():
+            for d in train_loader:
+                # =========================
+                # data loader
+                # =========================
+                input_ids = d['input_ids']
+                mask = d['attention_mask']
+                token_type_ids = d["token_type_ids"]
+                target = d["target"]
 
-                # train
-                model.train()
-                train_losses_batch = []
-                val_losses_batch = []
-                epoch_loss = 0
+                input_ids = input_ids.to(device)
+                mask = mask.to(device)
+                token_type_ids = token_type_ids.to(device)
+                target = target.to(device)
+                _, emb = model(input_ids, mask, token_type_ids)
+                train_emb = np.concatenate(
+                    [train_emb, emb.detach().cpu().numpy()], axis=0)
 
-                for d in train_loader:
-                    input_ids = d['input_ids']
-                    mask = d['attention_mask']
-                    token_type_ids = d["token_type_ids"]
-                    target = d["target"]
+        # val
+        with torch.no_grad():
+            for d in val_loader:
+                # =========================
+                # data loader
+                # =========================
+                input_ids = d['input_ids']
+                mask = d['attention_mask']
+                token_type_ids = d["token_type_ids"]
+                target = d["target"]
 
-                    input_ids = input_ids.to(device)
-                    mask = mask.to(device)
-                    token_type_ids = token_type_ids.to(device)
-                    target = target.to(device)
-                    optimizer.zero_grad()
-                    output, _ = model(input_ids, mask, token_type_ids)
-                    loss = criterion(output, target)
-                    loss.backward()
-                    optimizer.step()
-                    scheduler.step()
-                    train_losses_batch.append(loss.item())
+                input_ids = input_ids.to(device)
+                mask = mask.to(device)
+                token_type_ids = token_type_ids.to(device)
+                target = target.to(device)
+                _, emb = model(input_ids, mask, token_type_ids)
 
-                train_loss = np.mean(train_losses_batch)
+                val_emb = np.concatenate(
+                    [val_emb, emb.detach().cpu().numpy()], axis=0)
 
-                # val
-                model.eval()  # switch model to the evaluation mode
-                val_preds = np.ndarray((0, 1))
-                with torch.no_grad():
-                    # Predicting on validation set
-                    for d in val_loader:
-                        # =========================
-                        # data loader
-                        # =========================
-                        input_ids = d['input_ids']
-                        mask = d['attention_mask']
-                        token_type_ids = d["token_type_ids"]
-                        target = d["target"]
+        x_train = pd.DataFrame(train_emb)
+        x_val = pd.DataFrame(val_emb)
+        # svr
+        model_svr = SVR(C=10, kernel="rbf", gamma='auto')
+        model_svr.fit(x_train, y_train)
+        pred = model_svr.predict(x_val)
+        oof_svr[fold_array == fold] = pred
+        score = calc_loss(y_val, pred)
+        LOGGER.info(f"fold_svr:{fold}:{score}")
+        save_path = MODEL_PATH_BASE + "_svr_roberta_emb_{fold}.pkl"
+        pickle.dump(model_svr, open(save_path, 'wb'))
 
-                        input_ids = input_ids.to(device)
-                        mask = mask.to(device)
-                        token_type_ids = token_type_ids.to(device)
-                        target = target.to(device)
-                        output, _ = model(input_ids, mask, token_type_ids)
+        # ridge
+        ridge = Ridge(alpha=1)
+        ridge.fit(x_train, y_train)
+        pred = ridge.predict(x_val)
+        oof_ridge[fold_array == fold] = pred
+        score = calc_loss(y_val, pred)
+        LOGGER.info(f"fold_ridge:{fold}:{score}")
+        save_path = MODEL_PATH_BASE + "_ridge_roberta_emb_{fold}.pkl"
+        pickle.dump(ridge, open(save_path, 'wb'))
 
-                        loss = criterion(output, target)
-                        val_preds = np.concatenate(
-                            [val_preds, output.detach().cpu().numpy()], axis=0)
-                        val_losses_batch.append(loss.item())
 
-                val_loss = np.mean(val_losses_batch)
-                val_rmse = calc_loss(y_val, val_preds)
-                LOGGER.info(
-                    f'{fold},{epoch},train_loss:{train_loss},val_loss:{val_loss},val_rmse:{val_rmse}')
-                # ===================
-                # early stop
-                # ===================
-
-                if not best_val:
-                    best_val = val_loss
-                    best_rmse = val_rmse
-                    oof[fold_array == fold] = val_preds.reshape(-1)
-                    torch.save(model.state_dict(), MODEL_PATH_BASE +
-                               f"_{fold}.pth")  # Saving the model
-                    continue
-
-                if val_loss <= best_val:
-                    best_val = val_loss
-                    best_rmse = val_rmse
-                    oof[fold_array == fold] = val_preds.reshape(-1)
-                    patience = es_patience
-                    torch.save(model.state_dict(), MODEL_PATH_BASE +
-                               f"_{fold}.pth")  # Saving current best model
-                else:
-                    patience -= 1
-                    if patience == 0:
-                        LOGGER.info(
-                            f'Early stopping. Best Val : {best_val} Best Rmse : {best_rmse}')
-                        break
-
-val_rmse = calc_loss(y, oof)
-LOGGER.info(f'oof_score:{val_rmse}')
-np.save(OOF_SAVE_PATH, oof)
+val_rmse = calc_loss(y, oof_svr)
+LOGGER.info(f'svr_oof_score:{val_rmse}')
+val_rmse = calc_loss(y, oof_ridge)
+LOGGER.info(f'ridge_oof_score:{val_rmse}')
+np.save(OOF_SVR_SAVE_PATH, oof_svr)
+np.save(OOF_RIDGE_SAVE_PATH, oof_ridge)

@@ -7,7 +7,7 @@ from sklearn.metrics import mean_squared_error
 import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader
-from transformers import RobertaModel
+from transformers import AutoModel, AutoConfig
 from transformers import AdamW, get_linear_schedule_with_warmup
 from transformers import RobertaTokenizer
 import logging
@@ -17,12 +17,13 @@ import time
 import random
 from tqdm import tqdm
 import os
+import gc
 
 
 # ==================
 # Constant
 # ==================
-ex = "014"
+ex = "237"
 TRAIN_PATH = "../data/train.csv"
 FOLD_PATH = "../data/fe001_train_folds.csv"
 if not os.path.exists(f"../output/ex/ex{ex}"):
@@ -34,20 +35,22 @@ OOF_SAVE_PATH = f"../output/ex/ex{ex}/ex{ex}_oof.npy"
 LOGGER_PATH = f"../output/ex/ex{ex}/ex{ex}.txt"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 # ===============
 # Settings
 # ===============
 SEED = 0
 num_workers = 4
-BATCH_SIZE = 24
+BATCH_SIZE = 16
 n_epochs = 5
-es_patience = 3
+es_patience = 10
 max_len = 256
 weight_decay = 0.1
-lr = 5e-5
-num_warmup_steps = 10
+lr = 2e-5
+num_warmup_steps_rate = 0.1
+eval_steps = 20
 
-MODEL_PATH = '../models/roberta/roberta-base'
+MODEL_PATH = "../output/ex/ex_mlm_roberta_base/mlm_roberta_base"
 tokenizer = RobertaTokenizer.from_pretrained(MODEL_PATH)
 
 
@@ -95,28 +98,50 @@ class CommonLitDataset(Dataset):
 
 class roberta_model(nn.Module):
     def __init__(self):
-        super(roberta_model, self).__init__()
-        self.roberta = RobertaModel.from_pretrained(
-            MODEL_PATH,
-        )
-        self.drop = nn.Dropout(0.2)
-        self.fc = nn.Linear(768, 256)
-        self.layernorm = nn.LayerNorm(256)
-        self.drop2 = nn.Dropout(0.2)
-        self.relu = nn.ReLU()
-        self.out = nn.Linear(256, 1)
+        super().__init__()
 
-    def forward(self, ids, mask, token_type_ids):
-        # pooler
-        emb = self.roberta(ids, attention_mask=mask, token_type_ids=token_type_ids)[
-            'pooler_output']
-        output = self.drop(emb)
-        output = self.fc(output)
-        output = self.layernorm(output)
-        output = self.drop2(output)
-        output = self.relu(output)
-        output = self.out(output)
-        return output, emb
+        config = AutoConfig.from_pretrained(MODEL_PATH)
+        config.update({"output_hidden_states": True,
+                       "hidden_dropout_prob": 0.0,
+                       "layer_norm_eps": 1e-7})
+
+        self.roberta = AutoModel.from_pretrained(MODEL_PATH, config=config)
+
+        self.attention = nn.Sequential(
+            nn.Linear(768, 512),
+            nn.Tanh(),
+            nn.Linear(512, 1),
+            nn.Softmax(dim=1)
+        )
+
+        self.regressor = nn.Sequential(
+            nn.Linear(768, 1)
+        )
+
+    def forward(self, input_ids, attention_mask):
+        roberta_output = self.roberta(input_ids=input_ids,
+                                      attention_mask=attention_mask)
+
+        # There are a total of 13 layers of hidden states.
+        # 1 for the embedding layer, and 12 for the 12 Roberta layers.
+        # We take the hidden states from the last Roberta layer.
+        last_layer_hidden_states = roberta_output.hidden_states[-1]
+
+        # The number of cells is MAX_LEN.
+        # The size of the hidden state of each cell is 768 (for roberta-base).
+        # In order to condense hidden states of all cells to a context vector,
+        # we compute a weighted average of the hidden states of all cells.
+        # We compute the weight of each cell, using the attention neural network.
+        weights = self.attention(last_layer_hidden_states)
+
+        # weights.shape is BATCH_SIZE x MAX_LEN x 1
+        # last_layer_hidden_states.shape is BATCH_SIZE x MAX_LEN x 768
+        # Now we compute context_vector as the weighted average.
+        # context_vector.shape is BATCH_SIZE x 768
+        context_vector = torch.sum(weights * last_layer_hidden_states, dim=1)
+
+        # Now we reduce the context vector to the prediction score.
+        return self.regressor(context_vector)
 
 
 def calc_loss(y_true, y_pred):
@@ -193,9 +218,9 @@ with timer("roberta"):
 
         # loader
         train_loader = DataLoader(
-            dataset=train_, batch_size=BATCH_SIZE, shuffle=True, num_workers=num_workers)
+            dataset=train_, batch_size=BATCH_SIZE, shuffle=True, num_workers=4)
         val_loader = DataLoader(
-            dataset=val_, batch_size=BATCH_SIZE, shuffle=False, num_workers=num_workers)
+            dataset=val_, batch_size=BATCH_SIZE, shuffle=False, num_workers=4)
 
         # model
         model = roberta_model()
@@ -212,10 +237,12 @@ with timer("roberta"):
         ]
         optimizer = AdamW(optimizer_grouped_parameters,
                           lr=lr,
-                          betas=(0.9, 0.999),
+                          betas=(0.9, 0.98),
                           weight_decay=weight_decay,
                           )
         num_train_optimization_steps = int(len(train_loader) * n_epochs)
+        num_warmup_steps = int(
+            num_train_optimization_steps * num_warmup_steps_rate)
         scheduler = get_linear_schedule_with_warmup(optimizer,
                                                     num_warmup_steps=num_warmup_steps,
                                                     num_training_steps=num_train_optimization_steps)
@@ -229,10 +256,11 @@ with timer("roberta"):
                 # train
                 model.train()
                 train_losses_batch = []
-                val_losses_batch = []
+
                 epoch_loss = 0
 
-                for d in train_loader:
+                for i, d in enumerate(train_loader):
+
                     input_ids = d['input_ids']
                     mask = d['attention_mask']
                     token_type_ids = d["token_type_ids"]
@@ -243,69 +271,76 @@ with timer("roberta"):
                     token_type_ids = token_type_ids.to(device)
                     target = target.to(device)
                     optimizer.zero_grad()
-                    output, _ = model(input_ids, mask, token_type_ids)
+                    output = model(input_ids, mask)
                     loss = criterion(output, target)
                     loss.backward()
+                    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
                     optimizer.step()
                     scheduler.step()
                     train_losses_batch.append(loss.item())
 
-                train_loss = np.mean(train_losses_batch)
+                    if i % eval_steps == 0:
+                        # val
+                        val_losses_batch = []
+                        model.eval()  # switch model to the evaluation mode
+                        val_preds = np.ndarray((0, 1))
+                        with torch.no_grad():
+                            # Predicting on validation set
+                            for d in val_loader:
+                                # =========================
+                                # data loader
+                                # =========================
+                                input_ids = d['input_ids']
+                                mask = d['attention_mask']
+                                token_type_ids = d["token_type_ids"]
+                                target = d["target"]
 
-                # val
-                model.eval()  # switch model to the evaluation mode
-                val_preds = np.ndarray((0, 1))
-                with torch.no_grad():
-                    # Predicting on validation set
-                    for d in val_loader:
-                        # =========================
-                        # data loader
-                        # =========================
-                        input_ids = d['input_ids']
-                        mask = d['attention_mask']
-                        token_type_ids = d["token_type_ids"]
-                        target = d["target"]
+                                input_ids = input_ids.to(device)
+                                mask = mask.to(device)
+                                token_type_ids = token_type_ids.to(device)
+                                target = target.to(device)
+                                output = model(input_ids, mask)
 
-                        input_ids = input_ids.to(device)
-                        mask = mask.to(device)
-                        token_type_ids = token_type_ids.to(device)
-                        target = target.to(device)
-                        output, _ = model(input_ids, mask, token_type_ids)
+                                loss = criterion(output, target)
+                                val_preds = np.concatenate(
+                                    [val_preds, output.detach().cpu().numpy()], axis=0)
+                                val_losses_batch.append(loss.item())
 
-                        loss = criterion(output, target)
-                        val_preds = np.concatenate(
-                            [val_preds, output.detach().cpu().numpy()], axis=0)
-                        val_losses_batch.append(loss.item())
-
-                val_loss = np.mean(val_losses_batch)
-                val_rmse = calc_loss(y_val, val_preds)
-                LOGGER.info(
-                    f'{fold},{epoch},train_loss:{train_loss},val_loss:{val_loss},val_rmse:{val_rmse}')
-                # ===================
-                # early stop
-                # ===================
-
-                if not best_val:
-                    best_val = val_loss
-                    best_rmse = val_rmse
-                    oof[fold_array == fold] = val_preds.reshape(-1)
-                    torch.save(model.state_dict(), MODEL_PATH_BASE +
-                               f"_{fold}.pth")  # Saving the model
-                    continue
-
-                if val_loss <= best_val:
-                    best_val = val_loss
-                    best_rmse = val_rmse
-                    oof[fold_array == fold] = val_preds.reshape(-1)
-                    patience = es_patience
-                    torch.save(model.state_dict(), MODEL_PATH_BASE +
-                               f"_{fold}.pth")  # Saving current best model
-                else:
-                    patience -= 1
-                    if patience == 0:
+                        val_loss = np.mean(val_losses_batch)
+                        val_rmse = calc_loss(y_val, val_preds)
                         LOGGER.info(
-                            f'Early stopping. Best Val : {best_val} Best Rmse : {best_rmse}')
-                        break
+                            f'{fold},{epoch}:{i},val_loss:{val_loss},val_rmse:{val_rmse}')
+                        # ===================
+                        # early stop
+                        # ===================
+
+                        if not best_val:
+                            best_val = val_loss
+                            best_rmse = val_rmse
+                            oof[fold_array == fold] = val_preds.reshape(-1)
+                            # Saving the model
+                            torch.save(model.state_dict(),
+                                       MODEL_PATH_BASE + f"_{fold}.pth")
+                            continue
+
+                        if val_loss <= best_val:
+                            best_val = val_loss
+                            best_rmse = val_rmse
+                            oof[fold_array == fold] = val_preds.reshape(-1)
+                            patience = es_patience
+                            # Saving current best model
+                            torch.save(model.state_dict(),
+                                       MODEL_PATH_BASE + f"_{fold}.pth")
+                        # else:
+                        #    patience -= 1
+                        #    if patience == 0:
+                        #        LOGGER.info(f'Early stopping. Best Val : {best_val} Best Rmse : {best_rmse}')
+                        #        break
+                        model.train()
+
+                train_loss = np.mean(train_losses_batch)
+        del model
+        gc.collect()
 
 val_rmse = calc_loss(y, oof)
 LOGGER.info(f'oof_score:{val_rmse}')
