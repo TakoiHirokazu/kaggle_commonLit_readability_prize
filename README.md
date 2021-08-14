@@ -38,13 +38,15 @@ I used several pretrained models that are publicly available in the kaggle datas
  - `./models/xlnet` : https://www.kaggle.com/irustandi/xlnet-pretrained-models-pytorch
 
  # Prerocess
- ここにコマンド
+Plese download data to `./data` from https://www.kaggle.com/takoihiraokazu/commonlit-fold and unzip it. This is the data for cross validation, and is the result of re-running [here](https://www.kaggle.com/abhishek/step-1-create-folds).
+
 
  # Train
  `$ sh bin/train.sh` 
 
- Training results vary depending on the hardware, so if you want to reproduce the results, you need to change the hardware according to the model.
- However, please note that the results for ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) could not be reproduced even if the hardware is the same and the seed is fixed. Also, I hadn't fixed the seed in the pretrain of roberta-base, so if you want to reproduce ex237.py, please use  [here](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm). 
+ Training results vary depending on the hardware, so if you want to reproduce the results, you need to change the hardware according to the exp.
+ However, please note that the results for ex131.py(deberta-v2-xlarge), ex194.py(deberta-v2-xlarge), ex216.py(deberta-v2-xxlarge) and ex407.py(funnel-transformer-large) could not be reproduced even if the hardware is the same. Also, I hadn't fixed the seed in the pretrain of roberta-base(roberta_base_mlm.py), so if you want to reproduce ex237.py, please use  [here](https://www.kaggle.com/takoihiraokazu/clrp-roberta-base-mlm). 
+ The Hardware column in the table below lists the above Hardware numbers.
  
 | exp | Hardware|
 | ---- | ---- | 
@@ -74,7 +76,7 @@ I used several pretrained models that are publicly available in the kaggle datas
 | ex497.py | 2 |
 | ex507.py | 2 |
 
-# Ensemble & Postprocess
+# Ensemble & Post process
 ここにコマンド
 
 The ensemble weights were adjusted based on the output of the optimization and by looking at the Public Score.
