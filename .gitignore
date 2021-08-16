@@ -9,6 +9,8 @@ input/
 *.feather
 *.pyc
 *.pth
+*.zip
+*.docx
 
 
 #jupyter notebook
